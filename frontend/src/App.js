@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Instructions from './pages/Instructions';
 import Exam from './pages/Exam';
 import Result from './pages/Result';
+import Admin from './pages/Admin';
 import './App.css';
 
 function App() {
@@ -40,12 +41,18 @@ function App() {
     setPhase('result');
   };
 
+const isAdmin = window.location.pathname === '/admin';
+
   return (
     <div className="app">
-      {phase === 'login' && <Login onLogin={handleLogin} />}
-      {phase === 'instructions' && <Instructions authData={authData} onStart={handleStartExam} />}
-      {phase === 'exam' && <Exam authData={authData} onSubmit={handleSubmit} />}
-      {phase === 'result' && <Result data={resultData} student={authData?.student} />}
+      {isAdmin ? <Admin /> : (
+        <>
+          {phase === 'login' && <Login onLogin={handleLogin} />}
+          {phase === 'instructions' && <Instructions authData={authData} onStart={handleStartExam} />}
+          {phase === 'exam' && <Exam authData={authData} onSubmit={handleSubmit} />}
+          {phase === 'result' && <Result data={resultData} student={authData?.student} />}
+        </>
+      )}
     </div>
   );
 }
