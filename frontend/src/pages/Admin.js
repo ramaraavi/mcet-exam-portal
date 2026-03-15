@@ -10,6 +10,14 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('submitted');
   const [autoRefresh, setAutoRefresh] = useState(false);
 
+  // Add/Delete form state
+  const [newRoll, setNewRoll] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [formMsg, setFormMsg] = useState('');
+  const [formErr, setFormErr] = useState('');
+  const [formLoading, setFormLoading] = useState(false);
+
   const fetchData = async (key) => {
     setLoading(true);
     try {
@@ -39,6 +47,44 @@ export default function Admin() {
       return () => clearInterval(interval);
     }
   }, [authenticated, autoRefresh]);
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    setFormMsg(''); setFormErr('');
+    try {
+      const res = await fetch('/api/admin/add-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ roll_no: newRoll, name: newName, password_plain: newPass })
+      });
+      const json = await res.json();
+      if (!res.ok) { setFormErr(json.error); return; }
+      setFormMsg(`✓ ${json.student.name} (${json.student.rollNo}) added successfully!`);
+      setNewRoll(''); setNewName(''); setNewPass('');
+      fetchData();
+    } catch {
+      setFormErr('Failed to add student.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async (rollNo, name) => {
+    if (!window.confirm(`Are you sure you want to delete ${name} (${rollNo})?`)) return;
+    try {
+      const res = await fetch(`/api/admin/delete-student/${rollNo}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey }
+      });
+      const json = await res.json();
+      if (!res.ok) { alert(json.error); return; }
+      alert(`✓ ${name} deleted successfully!`);
+      fetchData();
+    } catch {
+      alert('Failed to delete student.');
+    }
+  };
 
   const formatTime = (secs) => {
     if (!secs) return 'N/A';
@@ -84,6 +130,7 @@ export default function Admin() {
 
   const submitted = data?.submitted || [];
   const active = data?.active || [];
+  const allStudents = data?.students || [];
 
   return (
     <div className="admin-page">
@@ -105,8 +152,12 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Stats overview */}
+      {/* Stats */}
       <div className="admin-stats">
+        <div className="admin-stat-card">
+          <div className="asc-val">{allStudents.length}</div>
+          <div className="asc-lbl">TOTAL STUDENTS</div>
+        </div>
         <div className="admin-stat-card">
           <div className="asc-val">{submitted.length}</div>
           <div className="asc-lbl">SUBMITTED</div>
@@ -116,7 +167,7 @@ export default function Admin() {
           <div className="asc-lbl">ACTIVE NOW</div>
         </div>
         <div className="admin-stat-card">
-          <div className="asc-val">{60 - submitted.length - active.length}</div>
+          <div className="asc-val">{allStudents.length - submitted.length - active.length}</div>
           <div className="asc-lbl">NOT STARTED</div>
         </div>
         <div className="admin-stat-card">
@@ -131,12 +182,6 @@ export default function Admin() {
           </div>
           <div className="asc-lbl">HIGHEST</div>
         </div>
-        <div className="admin-stat-card">
-          <div className="asc-val">
-            {submitted.length > 0 ? Math.min(...submitted.map(s => s.totalCorrect)) : 'N/A'}
-          </div>
-          <div className="asc-lbl">LOWEST</div>
-        </div>
       </div>
 
       {/* Tabs */}
@@ -150,9 +195,12 @@ export default function Admin() {
         <button className={`admin-tab ${activeTab === 'credentials' ? 'active' : ''}`} onClick={() => setActiveTab('credentials')}>
           🔑 CREDENTIALS
         </button>
+        <button className={`admin-tab ${activeTab === 'manage' ? 'active' : ''}`} onClick={() => setActiveTab('manage')}>
+          ⚙ MANAGE USERS
+        </button>
       </div>
 
-      {/* Submitted results table */}
+      {/* Submitted */}
       {activeTab === 'submitted' && (
         <div className="admin-table-wrap">
           {submitted.length === 0 ? (
@@ -204,7 +252,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Active students */}
+      {/* Active */}
       {activeTab === 'active' && (
         <div className="admin-table-wrap">
           {active.length === 0 ? (
@@ -259,7 +307,7 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody>
-              {(data?.students || []).map((s, i) => (
+              {allStudents.map((s, i) => (
                 <tr key={s.rollNo}>
                   <td>{i + 1}</td>
                   <td className="name-cell">{s.name}</td>
@@ -278,6 +326,104 @@ export default function Admin() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Manage Users */}
+      {activeTab === 'manage' && (
+        <div className="admin-manage">
+
+          {/* Add Student Form */}
+          <div className="manage-section">
+            <div className="manage-title">➕ ADD NEW STUDENT</div>
+            <form onSubmit={handleAddStudent} className="add-student-form">
+              <div className="add-form-row">
+                <div className="add-field">
+                  <label>ROLL NUMBER</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 727623BSC065"
+                    value={newRoll}
+                    onChange={e => setNewRoll(e.target.value)}
+                    required
+                    className="manage-input"
+                  />
+                </div>
+                <div className="add-field">
+                  <label>FULL NAME</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. STUDENT NAME"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    required
+                    className="manage-input"
+                  />
+                </div>
+                <div className="add-field">
+                  <label>PASSWORD</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Blue@065"
+                    value={newPass}
+                    onChange={e => setNewPass(e.target.value)}
+                    required
+                    className="manage-input"
+                  />
+                </div>
+                <button type="submit" className="add-student-btn" disabled={formLoading}>
+                  {formLoading ? '◐ ADDING...' : '➕ ADD'}
+                </button>
+              </div>
+              {formMsg && <div className="form-success">✓ {formMsg}</div>}
+              {formErr && <div className="form-error">⚠ {formErr}</div>}
+            </form>
+          </div>
+
+          {/* Delete Students Table */}
+          <div className="manage-section">
+            <div className="manage-title">🗑 DELETE STUDENTS ({allStudents.length} total)</div>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>NAME</th>
+                  <th>ROLL NO</th>
+                  <th>PASSWORD</th>
+                  <th>STATUS</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allStudents.map((s, i) => (
+                  <tr key={s.rollNo}>
+                    <td>{i + 1}</td>
+                    <td className="name-cell">{s.name}</td>
+                    <td className="roll-cell">{s.rollNo}</td>
+                    <td className="pass-cell">{s.password}</td>
+                    <td>
+                      {submitted.find(x => x.rollNo === s.rollNo) ? (
+                        <span style={{ color: 'var(--green)' }}>✓ SUBMITTED</span>
+                      ) : active.find(x => x.rollNo === s.rollNo) ? (
+                        <span style={{ color: 'var(--cyan)' }}>● ACTIVE</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>○ NOT STARTED</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className="delete-btn"
+                        onClick={() => handleDeleteStudent(s.rollNo, s.name)}
+                        disabled={!!submitted.find(x => x.rollNo === s.rollNo)}
+                      >
+                        🗑 DELETE
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
