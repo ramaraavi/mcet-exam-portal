@@ -258,6 +258,7 @@ export default function Exam({ authData, onSubmit }) {
         <div className="topbar-left">
           <span className="tb-logo">🛡️ MCET EXAMINATION</span>
           <span className="tb-candidate">{authData?.student?.name} | {authData?.student?.rollNo}</span>
+          <span className="powered-by">Powered by EthicalByte</span>
         </div>
         <div className={`exam-timer ${isLowTime ? 'low-time' : ''}`}>
           <span className="timer-label">TIME LEFT</span>

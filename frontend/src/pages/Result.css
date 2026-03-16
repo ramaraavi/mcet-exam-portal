@@ -130,3 +130,12 @@
   color: var(--text-muted);
   line-height: 1.6;
 }
+
+.powered-by {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  display: block;
+  margin-top: 2px;
+}

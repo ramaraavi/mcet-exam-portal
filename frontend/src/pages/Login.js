@@ -65,6 +65,7 @@ export default function Login({ onLogin }) {
         <div className="header-right">
           <div className="status-dot" />
           <span>SECURE SESSION</span>
+          <span className="powered-by">Powered by EthicalByte</span>
         </div>
       </div>
 

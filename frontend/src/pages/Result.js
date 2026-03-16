@@ -25,7 +25,10 @@ export default function Result({ data, student }) {
 
       <div className="result-header">
         <div>🛡️ MCET EXAMINATION PORTAL</div>
-        <div className="result-header-right">EXAMINATION COMPLETE</div>
+        <div className="result-header-right">
+          EXAMINATION COMPLETE
+          <span className="powered-by">Powered by EthicalByte</span>
+        </div>
       </div>
 
       <div className="result-content">

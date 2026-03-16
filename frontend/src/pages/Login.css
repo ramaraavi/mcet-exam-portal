@@ -257,3 +257,12 @@
   color: var(--text-muted);
 }
 .blink-dot { animation: blink 1s step-end infinite; color: var(--cyan-dim); }
+
+.powered-by {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}

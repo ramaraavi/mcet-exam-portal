@@ -199,3 +199,12 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 30px rgba(0,212,255,0.3);
 }
+
+.powered-by {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}

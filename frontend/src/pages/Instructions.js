@@ -21,6 +21,7 @@ export default function Instructions({ authData, onStart }) {
           <span className="cand-label">CANDIDATE:</span>
           <span className="cand-name">{authData?.student?.name}</span>
           <span className="cand-roll">[ {authData?.student?.rollNo} ]</span>
+          <span className="powered-by">Powered by EthicalByte</span>
         </div>
       </div>
 
