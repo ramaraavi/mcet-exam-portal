@@ -21,9 +21,11 @@ export default function Exam({ authData, onSubmit }) {
   const token = localStorage.getItem('exam_token');
   const autoSaveRef = useRef(null);
   const timerRef = useRef(null);
+  const submittedRef = useRef(false);
 
   const getHeaders = () => ({ Authorization: `Bearer ${token}` });
 
+  // ── Load questions and restore state ──────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -31,13 +33,25 @@ export default function Exam({ authData, onSubmit }) {
           axios.get('/api/questions', { headers: getHeaders() }),
           axios.get('/api/answers', { headers: getHeaders() })
         ]);
+
+        // Server auto-submitted due to time expiry on reload
+        if (aRes.data.autoSubmitted) {
+          onSubmit(aRes.data);
+          return;
+        }
+
         setQuestions(qRes.data.questions);
-        const elapsed = Math.floor((aRes.data.serverTime - aRes.data.startTime) / 1000);
-        const remaining = Math.max(0, 150 * 60 - elapsed);
+        const remaining = aRes.data.timeLeft ?? Math.max(0, 150 * 60 - Math.floor((aRes.data.serverTime - aRes.data.startTime) / 1000));
         setTimeLeft(remaining);
         setAnswers(aRes.data.answers || {});
         setMarkedForReview(aRes.data.markedForReview || {});
         setTabWarnings(aRes.data.tabSwitches || 0);
+
+        // Time already zero on reload
+        if (remaining <= 0) {
+          handleAutoSubmit();
+          return;
+        }
       } catch (err) {
         console.error('Load error:', err);
       } finally {
@@ -47,6 +61,7 @@ export default function Exam({ authData, onSubmit }) {
     load();
   }, []);
 
+  // ── Server-side timer ─────────────────────────────────────────────────────
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
@@ -61,6 +76,7 @@ export default function Exam({ authData, onSubmit }) {
     return () => clearInterval(timerRef.current);
   }, [questions]);
 
+  // ── Auto-save every 30 seconds ────────────────────────────────────────────
   useEffect(() => {
     autoSaveRef.current = setInterval(() => {
       Object.entries(answers).forEach(([qId, sel]) => {
@@ -70,8 +86,10 @@ export default function Exam({ authData, onSubmit }) {
     return () => clearInterval(autoSaveRef.current);
   }, [answers]);
 
+  // ── Tab switch detection ──────────────────────────────────────────────────
   useEffect(() => {
     const handleBlur = () => {
+      if (submittedRef.current) return;
       axios.post('/api/log-tabswitch', {}, { headers: getHeaders() }).then(res => {
         const count = res.data.tabSwitches;
         setTabWarnings(count);
@@ -88,14 +106,65 @@ export default function Exam({ authData, onSubmit }) {
     return () => window.removeEventListener('blur', handleBlur);
   }, []);
 
+  // ── Fullscreen enforcement ────────────────────────────────────────────────
+  useEffect(() => {
+    const requestFS = () => {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    };
+    requestFS();
+
+    const handleFSChange = () => {
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      if (!isFullscreen && !submittedRef.current) {
+        handleAutoSubmit();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFSChange);
+    document.addEventListener('webkitfullscreenchange', handleFSChange);
+    document.addEventListener('mozfullscreenchange', handleFSChange);
+    document.addEventListener('MSFullscreenChange', handleFSChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFSChange);
+      document.removeEventListener('webkitfullscreenchange', handleFSChange);
+      document.removeEventListener('mozfullscreenchange', handleFSChange);
+      document.removeEventListener('MSFullscreenChange', handleFSChange);
+    };
+  }, []);
+
+  // ── Block keyboard shortcuts ──────────────────────────────────────────────
   useEffect(() => {
     const blockKeys = (e) => {
       if (e.ctrlKey && ['c','v','u','a','s','p','f'].includes(e.key.toLowerCase())) e.preventDefault();
       if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key))) e.preventDefault();
       if (e.altKey && e.key === 'Tab') e.preventDefault();
+      if (e.key === 'Escape') e.preventDefault();
+      if (e.key === 'F5') e.preventDefault();
+      if (e.ctrlKey && e.key.toLowerCase() === 'r') e.preventDefault();
     };
     document.addEventListener('keydown', blockKeys);
     return () => document.removeEventListener('keydown', blockKeys);
+  }, []);
+
+  // ── Auto submit on page unload/reload ─────────────────────────────────────
+  useEffect(() => {
+    const handleUnload = () => {
+      if (submittedRef.current) return;
+      const t = localStorage.getItem('exam_token');
+      navigator.sendBeacon('/api/submit-beacon', JSON.stringify({ token: t }));
+    };
+    window.addEventListener('unload', handleUnload);
+    return () => window.removeEventListener('unload', handleUnload);
   }, []);
 
   const sectionQuestions = (secIdx) => questions.filter(q => q.section === secIdx + 1);
@@ -124,6 +193,8 @@ export default function Exam({ authData, onSubmit }) {
   };
 
   const handleAutoSubmit = useCallback(async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     clearInterval(timerRef.current);
     clearInterval(autoSaveRef.current);
     try {
@@ -133,6 +204,8 @@ export default function Exam({ authData, onSubmit }) {
   }, []);
 
   const handleSubmit = async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitting(true);
     clearInterval(timerRef.current);
     clearInterval(autoSaveRef.current);
@@ -141,6 +214,7 @@ export default function Exam({ authData, onSubmit }) {
       onSubmit(res.data);
     } catch {
       setSubmitting(false);
+      submittedRef.current = false;
     }
   };
 
