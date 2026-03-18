@@ -27,7 +27,10 @@ app.use(express.json());
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { error: 'Too many login attempts. Try again in 15 minutes.' }
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+  keyGenerator: (req) => {
+    return req.body?.rollNo?.trim().toUpperCase() || req.ip;
+  }
 });
 
 const authenticate = (req, res, next) => {
@@ -160,7 +163,6 @@ app.get('/api/answers', authenticate, (req, res) => {
   const elapsed = Math.floor((Date.now() - req.session.startTime) / 1000);
   const timeLeft = Math.max(0, EXAM_DURATION - elapsed);
 
-  // Auto submit if time expired on reload
   if (timeLeft <= 0) {
     const result = autoSubmitStudent(req.student.rollNo, req.session, req.token);
     if (result) return res.json(result);
@@ -237,7 +239,8 @@ app.delete('/api/admin/delete-student/:rollNo', (req, res) => {
   res.json({ message: 'Student deleted successfully' });
 });
 
-// ─── Beacon Submit (fires on page unload/reload) ──────────────────────────────
+// ─── Beacon Submit ────────────────────────────────────────────────────────────
+
 app.post('/api/submit-beacon', (req, res) => {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
